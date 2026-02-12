@@ -1,139 +1,151 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
-#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <string.h>
 
-#define PORT 8080
-#define MAX 1024
-
-void sortArray(int arr[], int n, int ascending)
-{
-    int temp;
-    for (int i = 0; i < n - 1; i++)
-    {
-        for (int j = i + 1; j < n; j++)
-        {
-            if ((ascending && arr[i] > arr[j]) ||
-                (!ascending && arr[i] < arr[j]))
-            {
-                temp = arr[i];
-                arr[i] = arr[j];
-                arr[j] = temp;
-            }
-        }
-    }
-}
+#define MAXSIZE 100
 
 int main()
 {
-    int server_fd, new_socket;
-    struct sockaddr_in address;
-    socklen_t addrlen = sizeof(address);
-    char buffer[MAX];
+    int sockfd, newsockfd, retval;
+    socklen_t actuallen;
+    int sentbytes, recedbytes;
+    struct sockaddr_in serveraddr, clientaddr;
+    char buff[MAXSIZE];
+    int n, arr[20], choice, num, i, j;
 
-    server_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (server_fd < 0)
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd == -1)
     {
-        perror("Socket failed");
-        exit(1);
+        printf("Socket Creation Error\n");
+        return 0;
     }
 
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons(PORT);
+    serveraddr.sin_family = AF_INET;
+    serveraddr.sin_port = htons(3388);
+    serveraddr.sin_addr.s_addr = INADDR_ANY;
 
-    bind(server_fd, (struct sockaddr *)&address, sizeof(address));
-    listen(server_fd, 3);
+    retval = bind(sockfd, (struct sockaddr *)&serveraddr, sizeof(serveraddr));
+    if (retval == -1)
+    {
+        printf("Binding Error\n");
+        return 0;
+    }
 
-    printf("Server listening on port %d...\n", PORT);
+    listen(sockfd, 1);
+    printf("Server Waiting...\n");
 
-    new_socket = accept(server_fd, (struct sockaddr *)&address, &addrlen);
-    printf("Client connected!\n");
+    actuallen = sizeof(clientaddr);
+    newsockfd = accept(sockfd, (struct sockaddr *)&clientaddr, &actuallen);
 
     while (1)
     {
-        int n, choice, num;
-        int arr[100];
-        char response[MAX];
-        response[0] = '\0';
+        recv(newsockfd, &n, sizeof(int), 0);
 
-        read(new_socket, &n, sizeof(int));
         if (n == 0)
         {
-            printf("Client exited.\n");
+            printf("Client exited\n");
             break;
         }
 
-        read(new_socket, arr, n * sizeof(int));
-        read(new_socket, &choice, sizeof(int));
+        recv(newsockfd, arr, n * sizeof(int), 0);
+        recv(newsockfd, &choice, sizeof(int), 0);
 
-        printf("\n--- Server Received Data ---\n");
-        printf("Number of elements: %d\n", n);
-
-        printf("Array elements: ");
-        for (int i = 0; i < n; i++)
+        printf("\n--- Server Received ---\n");
+        printf("Elements: ");
+        for (i = 0; i < n; i++)
             printf("%d ", arr[i]);
-        printf("\n");
+        printf("\nChoice: %d\n", choice);
 
-        printf("Choice received: %d\n", choice);
+        buff[0] = '\0';
 
         if (choice == 1)
         {
-            read(new_socket, &num, sizeof(int));
-            printf("Search key received: %d\n", num);
+            recv(newsockfd, &num, sizeof(int), 0);
+            printf("Search Key: %d\n", num);
 
-            int foundIndex = -1;
-            for (int i = 0; i < n; i++)
-            {
+            int index = -1;
+            for (i = 0; i < n; i++)
                 if (arr[i] == num)
                 {
-                    foundIndex = i;
+                    index = i;
                     break;
                 }
-            }
 
-            if (foundIndex != -1)
-                sprintf(response, "Number %d found at index %d", num, foundIndex);
+            if (index != -1)
+                sprintf(buff, "Number %d found at index %d", num, index);
             else
-                sprintf(response, "Number %d not found in array", num);
+                sprintf(buff, "Number %d not found", num);
         }
 
         else if (choice == 2)
         {
-            sortArray(arr, n, 1);
-            sprintf(response, "Sorted Ascending: ");
-            for (int i = 0; i < n; i++)
-                sprintf(response + strlen(response), "%d ", arr[i]);
+            for (i = 0; i < n - 1; i++)
+                for (j = i + 1; j < n; j++)
+                    if (arr[i] > arr[j])
+                    {
+                        int t = arr[i];
+                        arr[i] = arr[j];
+                        arr[j] = t;
+                    }
+
+            strcpy(buff, "Ascending Order: ");
+            for (i = 0; i < n; i++)
+            {
+                char temp[10];
+                sprintf(temp, "%d ", arr[i]);
+                strcat(buff, temp);
+            }
         }
 
         else if (choice == 3)
         {
-            sortArray(arr, n, 0);
-            sprintf(response, "Sorted Descending: ");
-            for (int i = 0; i < n; i++)
-                sprintf(response + strlen(response), "%d ", arr[i]);
+            for (i = 0; i < n - 1; i++)
+                for (j = i + 1; j < n; j++)
+                    if (arr[i] < arr[j])
+                    {
+                        int t = arr[i];
+                        arr[i] = arr[j];
+                        arr[j] = t;
+                    }
+
+            strcpy(buff, "Descending Order: ");
+            for (i = 0; i < n; i++)
+            {
+                char temp[10];
+                sprintf(temp, "%d ", arr[i]);
+                strcat(buff, temp);
+            }
         }
 
         else if (choice == 4)
         {
-            sprintf(response, "Even: ");
-            for (int i = 0; i < n; i++)
+            strcpy(buff, "Even: ");
+            for (i = 0; i < n; i++)
                 if (arr[i] % 2 == 0)
-                    sprintf(response + strlen(response), "%d ", arr[i]);
+                {
+                    char temp[10];
+                    sprintf(temp, "%d ", arr[i]);
+                    strcat(buff, temp);
+                }
 
-            strcat(response, "| Odd: ");
-            for (int i = 0; i < n; i++)
+            strcat(buff, "| Odd: ");
+            for (i = 0; i < n; i++)
                 if (arr[i] % 2 != 0)
-                    sprintf(response + strlen(response), "%d ", arr[i]);
+                {
+                    char temp[10];
+                    sprintf(temp, "%d ", arr[i]);
+                    strcat(buff, temp);
+                }
         }
 
-        printf("Server Output: %s\n", response);
-
-        write(new_socket, response, strlen(response) + 1);
+        printf("Server Output: %s\n", buff);
+        send(newsockfd, buff, sizeof(buff), 0);
     }
 
-    close(new_socket);
-    close(server_fd);
+    close(newsockfd);
+    close(sockfd);
     return 0;
 }
