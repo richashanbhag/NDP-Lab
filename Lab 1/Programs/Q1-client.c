@@ -1,80 +1,76 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <netinet/in.h>
 #include <arpa/inet.h>
+#include <string.h>
 
-#define PORT 8080
-#define MAX 1024
+#define MAXSIZE 100
 
 int main()
 {
-    int sock = 0;
-    struct sockaddr_in serv_addr;
-    char buffer[MAX];
+    int sockfd, retval;
+    int sentbytes, recedbytes;
+    struct sockaddr_in serveraddr;
+    char buff[MAXSIZE];
+    int n, arr[20], choice, num, i;
 
-    sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock < 0)
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd == -1)
     {
-        printf("Socket creation error\n");
-        return 1;
+        printf("Socket Creation Error\n");
+        return 0;
     }
 
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_port = htons(PORT);
-    serv_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    serveraddr.sin_family = AF_INET;
+    serveraddr.sin_port = htons(3388);
+    serveraddr.sin_addr.s_addr = inet_addr("127.0.0.1");
 
-    if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
+    retval = connect(sockfd, (struct sockaddr *)&serveraddr, sizeof(serveraddr));
+    if (retval == -1)
     {
-        printf("Connection failed\n");
-        return 1;
+        printf("Connection Error\n");
+        return 0;
     }
-
-    printf("Connected to server!\n");
 
     while (1)
     {
-        int n, arr[100], choice, num;
-
         printf("\nEnter number of elements (0 to exit): ");
         scanf("%d", &n);
+
+        send(sockfd, &n, sizeof(int), 0);
+
         if (n == 0)
-        {
-            int exitChoice = 5;
-            write(sock, &n, sizeof(int));
-            write(sock, arr, 0);
-            write(sock, &exitChoice, sizeof(int));
             break;
-        }
 
         printf("Enter %d elements: ", n);
-        for (int i = 0; i < n; i++)
+        for (i = 0; i < n; i++)
             scanf("%d", &arr[i]);
 
-        printf("\nChoose operation:\n");
-        printf("1. Search\n2. Sort Ascending\n3. Sort Descending\n4. Split Odd/Even\n5. Exit\n");
-        printf("Enter your choice: ");
+        printf("\n1.Search\n2.Sort Ascending\n3.Sort Descending\n4.Split Odd/Even\n5.Exit\n");
+        printf("Enter choice: ");
         scanf("%d", &choice);
 
-        write(sock, &n, sizeof(int));
-        write(sock, arr, n * sizeof(int));
-        write(sock, &choice, sizeof(int));
+        send(sockfd, arr, n * sizeof(int), 0);
+        send(sockfd, &choice, sizeof(int), 0);
 
         if (choice == 1)
         {
             printf("Enter number to search: ");
             scanf("%d", &num);
-            write(sock, &num, sizeof(int));
+            send(sockfd, &num, sizeof(int), 0);
         }
 
-        read(sock, buffer, MAX);
-        printf("Server: %s\n", buffer);
+        recedbytes = recv(sockfd, buff, sizeof(buff), 0);
+        buff[recedbytes] = '\0';
+
+        printf("Server Output: %s\n", buff);
 
         if (choice == 5)
             break;
     }
 
-    close(sock);
-    printf("Disconnected from server.\n");
+    close(sockfd);
     return 0;
 }
