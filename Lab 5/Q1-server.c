@@ -74,7 +74,7 @@ int main()
         ci->addr = cli;
 
         pthread_create(&tid, NULL, handle_client, ci);
-        pthread_join(tid, NULL);
+        pthread_join(tid, NULL);//pthread_detach(tid);
     }
 
     FILE *fp = fopen("data.txt", "r");
